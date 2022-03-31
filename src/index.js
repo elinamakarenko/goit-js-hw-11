@@ -16,11 +16,22 @@ const URL = "https://pixabay.com/api/";
 
 let page=1;
 let searchQuevery="";
-let images;
+let countImages=0;
+const perPage = 40;
+const orientation = "horizontal";
+const imageType = "photo";
+const safesearch = "true";
+let lightbox = new SimpleLightbox(".gallery a");
+lightbox.on('show.simplelightbox', function () {});
 
 async function fetchApi(searchQuevery, page){
     try{
-        const response = await axios.get(`${URL}?key=${KEY}&q=${searchQuevery}&image_type="photo"&orientation="horizontal"&safesearch="true"&page=${page}&per_page=40`);
+        const response = await axios.get(`${URL}?key=${KEY}&q=${searchQuevery}&image_type=${imageType}&orientation=${orientation}&safesearch=${safesearch}&page=${page}&per_page=${perPage}`);
+        const images = response.data;
+        if(images.hits.length===0){
+            throw new Error();
+        } 
+        return images;
     } catch (error) {
         console.log(error);
     }
@@ -34,26 +45,70 @@ function incrementPage(){
     page += 1;
 }
 
+function resetGallery(){
+   refs.gallery.innerHTML="";
+}
+
 refs.form.addEventListener("submit", event=>{
     event.preventDefault();
     searchQuevery = event.currentTarget.elements.searchQuery.value;
     resetPage();
-  fetchApi(searchQuevery, page) 
-  .then(data=>{
-    page+=1;
-    return data;
-});
-  console.log(images);
-  gallaryAdd (images);
+    resetGallery();
+  fetchApi(searchQuevery, page)
+  .then(images=>{
+    Notiflix.Notify.success(`Hooray! We found ${images.totalHits} images.`);
+    countImages+=images.hits.length;
+    gallaryAdd (images.hits);
+    lightbox.refresh();
+    if(countImages===images.totalHits){
+        Notiflix.Notify.info("We're sorry, but you've reached the end of search results.");
+   
+    } else { 
+        refs.buttonLoad.style.display = "block";
+    loadScroll();
+}
+    }
+        
+)
+    .catch(error=>{
+        Notiflix.Notify.failure("Sorry, there are no images matching your search query. Please try again.");
 })
+});
 
 refs.buttonLoad.addEventListener("click", event=>{
     event.preventDefault();
     incrementPage();
-   fetchApi(searchQuevery, page);
+    refs.buttonLoad.style.display = "none";
+    
+   fetchApi(searchQuevery, page) 
+   .then(images=>{ 
+       countImages+=images.hits.length;
+    gallaryAdd (images.hits);
+    lightbox.refresh();
+    if(countImages===images.totalHits){
+        Notiflix.Notify.info("We're sorry, but you've reached the end of search results.");
    
-    gallaryAdd (images);
+    } else { 
+        refs.buttonLoad.style.display = "block";
+        loadScroll();
+    }
+        
 })
+    .catch(error=>{
+       console.log(error);
+    }) 
+});
+
 function gallaryAdd (images){
     refs.gallery.insertAdjacentHTML("beforeend", imageT(images));
+}
+
+function loadScroll (){
+    const { height: cardHeight } = refs.gallery
+  .firstElementChild.getBoundingClientRect();
+
+window.scrollBy({
+  top: cardHeight * 2,
+  behavior: "smooth",
+});
 }
